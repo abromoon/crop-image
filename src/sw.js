@@ -6,7 +6,7 @@
 
 // Бампать при смене состава/структуры кэша. Обычные правки файлов
 // подхватываются сами (stale-while-revalidate).
-const CACHE_NAME = "crop-image-v1";
+const CACHE_NAME = "crop-image-v2";
 
 // При добавлении новых файлов приложения — внеси их сюда.
 const APP_SHELL = [
@@ -19,6 +19,10 @@ const APP_SHELL = [
   "icons/icon-512.png",
   "icons/icon-maskable-512.png",
   "icons/apple-touch-icon.png",
+  "fonts/roboto-flex-latin.woff2",
+  "fonts/roboto-flex-cyrillic.woff2",
+  "fonts/google-sans-latin.woff2",
+  "fonts/google-sans-cyrillic.woff2",
 ];
 
 const SHARE_TARGET_PATH = new URL("share-target", self.registration.scope).pathname;

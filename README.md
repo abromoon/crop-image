@@ -17,6 +17,12 @@
 Изображение никогда не покидает браузер: ни загрузки на сервер, ни сохранения
 между сеансами. В `localStorage` запоминается только выбранная тема оформления.
 
+Шрифты [Roboto Flex](https://fonts.google.com/specimen/Roboto+Flex) и
+[Google Sans](https://fonts.google.com/specimen/Google+Sans) (SIL Open Font
+License 1.1, лицензии — в `src/fonts/`) лежат вместе с приложением, так что
+страница не обращается к сторонним серверам. Иконки —
+[Material Symbols](https://fonts.google.com/icons) (Apache License 2.0).
+
 ### Установка как приложение (PWA)
 
 Страницу можно установить как приложение, после этого она работает и без

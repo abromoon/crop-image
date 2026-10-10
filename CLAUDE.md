@@ -91,6 +91,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   согласованно.
 - Скачивание файла — через временный `<a download>` + `URL.createObjectURL`,
   без сетевых запросов.
+- Шрифты: `--font-text` (Roboto Flex — основной текст) и `--font-display`
+  (Google Sans — заголовки, подписи инструментов, шапка, кнопки) в `:root`.
+  Файлы — свои, в `src/fonts/` (woff2, подмножества latin + cyrillic, оси
+  `wght` 400–700, у Roboto Flex ещё `opsz`; рядом OFL-лицензии). Google Fonts
+  CDN не подключать: это запрос к третьей стороне на каждом заходе и потеря
+  шрифта офлайн. Google Sans Flex не годится — в нём нет кириллицы. Новый
+  файл шрифта → `@font-face` с `unicode-range` + `APP_SHELL` + бамп `CACHE_NAME`.
+- Иконки: Material Symbols Rounded (вес 400, без заливки) как inline SVG —
+  `<svg class="icon" viewBox="0 -960 960 960" width="20" height="20"
+  aria-hidden="true"><path d="…"/></svg>`, `path` берётся из
+  `fonts.gstatic.com/s/i/short-term/release/materialsymbolsrounded/<name>/default/24px.svg`.
+  Цвет — `fill: currentColor` из `.icon`. Логотип и PWA-иконки (`icons/`) — свои.
 - Тема: цвета — CSS-переменные в `:root` (`style.css`). Тёмный набор
   описан дважды — под `prefers-color-scheme: dark` (режим «Авто») и под
   `:root[data-theme="dark"]`; меняя цвета, правь оба блока. Переключатель
