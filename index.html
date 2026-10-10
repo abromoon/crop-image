@@ -4,16 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Обрезка в квадрат</title>
+<meta name="theme-color" content="#f6f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>
+  // Применяем сохранённую тему до загрузки стилей, чтобы страница не мигала.
+  try {
+    var savedTheme = localStorage.getItem("crop-image:theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      document.documentElement.dataset.theme = savedTheme;
+    }
+  } catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main class="app">
   <header class="app__header">
-    <h1>Обрезка изображения в квадрат</h1>
-    <p class="app__subtitle">
-      Перетащите изображение, выберите якорь и сохраните результат.
-      Всё происходит прямо в браузере — изображение никуда не отправляется и нигде не сохраняется.
-    </p>
+    <div class="app__heading">
+      <h1>Обрезка изображения в квадрат</h1>
+      <p class="app__subtitle">
+        Перетащите изображение, выберите якорь или передвиньте рамку на превью и сохраните результат.
+        Всё происходит прямо в браузере — изображение никуда не отправляется и нигде не сохраняется.
+      </p>
+    </div>
+    <div class="theme-switch" role="group" aria-label="Тема оформления">
+      <button type="button" data-theme-value="auto" aria-pressed="true">Авто</button>
+      <button type="button" data-theme-value="light" aria-pressed="false">Светлая</button>
+      <button type="button" data-theme-value="dark" aria-pressed="false">Тёмная</button>
+    </div>
   </header>
 
   <section id="dropzone" class="dropzone" tabindex="0" aria-label="Область для перетаскивания изображения">
@@ -31,10 +52,35 @@
   <section id="editor" class="editor" hidden>
     <div class="editor__preview-wrap">
       <div id="preview-frame" class="preview-frame">
-        <img id="preview-img" alt="Предпросмотр изображения">
+        <img id="preview-img" alt="Предпросмотр изображения" draggable="false">
         <div id="crop-overlay" class="crop-overlay" aria-hidden="true"></div>
       </div>
-      <p id="dimensions" class="dimensions"></p>
+
+      <aside class="info-panel" aria-label="Информация об изображении">
+        <section class="info-panel__section">
+          <h2 class="info-panel__title">Исходное</h2>
+          <dl class="info-list">
+            <dt>Файл</dt><dd data-info="src-name"></dd>
+            <dt>Формат</dt><dd data-info="src-format"></dd>
+            <dt>Размер</dt><dd data-info="src-dimensions"></dd>
+            <dt>Пропорции</dt><dd data-info="src-aspect"></dd>
+            <dt>Вес</dt><dd data-info="src-bytes"></dd>
+            <dt>Изменён</dt><dd data-info="src-modified"></dd>
+          </dl>
+        </section>
+        <section class="info-panel__section">
+          <h2 class="info-panel__title">Результат</h2>
+          <dl class="info-list">
+            <dt>Файл</dt><dd data-info="out-name"></dd>
+            <dt>Формат</dt><dd data-info="out-format"></dd>
+            <dt>Размер</dt><dd data-info="out-dimensions"></dd>
+            <dt>Положение</dt><dd data-info="out-position"></dd>
+            <dt>Отрезано</dt><dd data-info="out-trim"></dd>
+            <dt>Площадь</dt><dd data-info="out-area"></dd>
+            <dt>Вес</dt><dd data-info="out-bytes"></dd>
+          </dl>
+        </section>
+      </aside>
     </div>
 
     <div class="editor__controls">
@@ -46,6 +92,7 @@
           <option value="bottom">Снизу</option>
           <option value="left">Слева</option>
           <option value="right">Справа</option>
+          <option value="custom" hidden disabled>Вручную</option>
         </select>
       </label>
 
