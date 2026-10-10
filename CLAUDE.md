@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Два независимых способа обрезать изображение в квадрат с выбором якоря (сверху /
 по центру / снизу / слева / справа): статическая веб-страница для GitHub Pages
-(`index.html` + `style.css` + `app.js`) и отдельный CLI-скрипт на Python
+(папка `src/`: `index.html` + `style.css` + `app.js`) и отдельный CLI-скрипт на Python
 (`crop_image.py`). Между ними нет общего кода и зависимостей — это две разные
 реализации одной идеи, живущие в одном репозитории.
 
@@ -23,9 +23,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Сборки, линтеров и тестов в проекте нет.
 
-- Запуск веб-версии локально: открыть `index.html` в браузере, либо поднять
-  любой статический сервер (например, `python3 -m http.server`) в корне
-  репозитория. Service worker (офлайн, «Поделиться») работает только на
+- Запуск веб-версии локально: открыть `src/index.html` в браузере, либо поднять
+  любой статический сервер из `src/` (например, `python3 -m http.server -d src`
+  из корня репозитория). Service worker (офлайн, «Поделиться») работает только на
   `localhost`/HTTPS, не на `file://`; после правок файлов приложения первая
   перезагрузка отдаёт старую версию из кэша (stale-while-revalidate) — для
   отладки включи в DevTools «Update on reload» или перезагрузи дважды.
@@ -109,7 +109,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Деплой
 
-`.github/workflows/deploy.yml` публикует содержимое репозитория как есть
-(без шага сборки) на GitHub Pages при каждом push в `main`. Требует
+`.github/workflows/deploy.yml` публикует содержимое папки `src/` как есть
+(без шага сборки) на GitHub Pages при каждом push в `main`; всё вне `src/`
+(CLI, документация) на сайт не попадает. Все пути внутри `src/` относительные —
+папку можно публиковать как корень сайта или из подкаталога. Требует
 одноразовой настройки в репозитории: Settings → Pages → Build and
 deployment → Source: GitHub Actions.
