@@ -68,10 +68,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Тема: цвета — CSS-переменные в `:root` (`style.css`). Тёмный набор
   описан дважды — под `prefers-color-scheme: dark` (режим «Авто») и под
   `:root[data-theme="dark"]`; меняя цвета, правь оба блока. Переключатель
-  «Авто / Светлая / Тёмная» в шапке выставляет `data-theme` на `<html>`
-  (`applyTheme`/`saveTheme` в `app.js`), а inline-скрипт в `<head>`
+  «Авто / Светлая / Тёмная» (иконки) в шапке сайта выставляет `data-theme` на
+  `<html>` (`applyTheme`/`saveTheme` в `app.js`), а inline-скрипт в `<head>`
   `index.html` применяет сохранённую тему до загрузки стилей, чтобы не было
   мигания.
+- Шапка сайта `.site-header` (над `<main class="app">`, во всю ширину, не
+  закреплена): логотип → меню сервисов → переключатель темы. Меню — нативный
+  `<details class="service-menu">`; `app.js` только закрывает его по клику
+  снаружи и по Escape. Новый сервис = новая ссылка в `.service-menu__list`
+  (у текущего — `aria-current="page"`) и его название в `summary`.
 
 ## PWA
 

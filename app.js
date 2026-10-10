@@ -476,6 +476,25 @@ themeButtons.forEach((btn) => {
 
 applyTheme(readStoredTheme());
 
+// --- Меню сервисов в шапке ---
+// Открытие/закрытие и клавиатуру даёт нативный <details>; дополняем
+// закрытием по клику снаружи и по Escape.
+
+const serviceMenu = document.querySelector(".service-menu");
+
+document.addEventListener("click", (e) => {
+  if (serviceMenu.open && !serviceMenu.contains(e.target)) {
+    serviceMenu.open = false;
+  }
+});
+
+serviceMenu.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && serviceMenu.open) {
+    serviceMenu.open = false;
+    serviceMenu.querySelector("summary").focus();
+  }
+});
+
 // --- PWA ---
 
 if ("serviceWorker" in navigator) {
