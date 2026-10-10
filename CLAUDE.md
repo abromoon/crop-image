@@ -4,6 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Что это
 
+Название проекта — **SNIP** (Simple No-upload Image Processing); так он
+подписан в шапке, `<title>` и манифесте. Внутренние идентификаторы
+(`crop-image:theme` в `localStorage`, `CACHE_NAME` в `sw.js`, имя репозитория)
+намеренно остались `crop-image` — их смена сбросит тему и кэш у пользователей.
+
 Два независимых способа обрезать изображение в квадрат с выбором якоря (сверху /
 по центру / снизу / слева / справа): статическая веб-страница для GitHub Pages
 (папка `src/`: `index.html` + `style.css` + `app.js`) и отдельный CLI-скрипт на Python

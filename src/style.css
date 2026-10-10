@@ -105,8 +105,18 @@ body {
 
 .site-header__logo {
   display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
   border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.site-header__name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .site-header__logo img {
@@ -229,6 +239,7 @@ body {
   }
 
   .site-header__slash,
+  .site-header__name,
   .service-menu__current .service-menu__icon {
     display: none;
   }
