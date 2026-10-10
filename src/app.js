@@ -1,5 +1,6 @@
 "use strict";
 
+const startScreen = document.getElementById("start");
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("file-input");
 const browseBtn = document.getElementById("browse-btn");
@@ -8,7 +9,9 @@ const editor = document.getElementById("editor");
 const previewFrame = document.getElementById("preview-frame");
 const previewImg = document.getElementById("preview-img");
 const cropOverlay = document.getElementById("crop-overlay");
-const anchorSelect = document.getElementById("anchor-select");
+const anchorButtons = document.querySelectorAll("[data-anchor]");
+const anchorMarker = document.getElementById("anchor-marker");
+const anchorCaption = document.getElementById("anchor-caption");
 const formatNote = document.getElementById("format-note");
 const confirmBtn = document.getElementById("confirm-btn");
 const resetBtn = document.getElementById("reset-btn");
@@ -46,6 +49,23 @@ const LOSSLESS_TYPES = new Set(["image/png"]);
 // Форматы, которые Canvas умеет сохранять напрямую (пусть и с перекодированием).
 const CANVAS_EXPORTABLE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
+// Якоря сетки 3×3: col — 0 слева … 2 справа, row — 0 сверху … 2 снизу.
+const ANCHORS = {
+  "top-left": { col: 0, row: 0, label: "Сверху слева" },
+  top: { col: 1, row: 0, label: "Сверху" },
+  "top-right": { col: 2, row: 0, label: "Сверху справа" },
+  left: { col: 0, row: 1, label: "Слева" },
+  center: { col: 1, row: 1, label: "По центру" },
+  right: { col: 2, row: 1, label: "Справа" },
+  "bottom-left": { col: 0, row: 2, label: "Снизу слева" },
+  bottom: { col: 1, row: 2, label: "Снизу" },
+  "bottom-right": { col: 2, row: 2, label: "Снизу справа" },
+};
+
+// Насколько близко (в экранных px) рамку надо подтащить к позиции якоря,
+// чтобы она прилипла: при крупном исходнике точный центр мышью не поймать.
+const SNAP_PX = 6;
+
 let state = {
   file: null,
   objectUrl: null,
@@ -53,7 +73,12 @@ let state = {
   width: 0,
   height: 0,
   crop: null, // { x, y, side } в пикселях исходного изображения
+  manual: false, // рамку сдвинули вручную и она не стоит на позиции якоря
 };
+
+// Выбранный якорь. Живёт вне state, чтобы пережить «Другое»,
+// и только в памяти — в localStorage не пишется.
+let anchorPref = "center";
 
 // Текущее перетаскивание рамки (null, если не тащим).
 let drag = null;
@@ -69,10 +94,10 @@ function resetState() {
   }
   clearTimeout(sizeTimer);
   sizeSeq++;
-  state = { file: null, objectUrl: null, image: null, width: 0, height: 0, crop: null };
+  state = { file: null, objectUrl: null, image: null, width: 0, height: 0, crop: null, manual: false };
   fileInput.value = "";
   editor.hidden = true;
-  dropzone.hidden = false;
+  startScreen.hidden = false;
 }
 
 function openFileDialog() {
@@ -144,10 +169,10 @@ function loadFile(file) {
 
     updateSourceInfo();
     updateFormatNote(file.type);
-    if (anchorSelect.value === "custom") anchorSelect.value = "center";
+    state.manual = false;
     applyAnchor();
 
-    dropzone.hidden = true;
+    startScreen.hidden = true;
     editor.hidden = false;
   };
 
@@ -159,11 +184,30 @@ function loadFile(file) {
   img.src = objectUrl;
 }
 
+function anchorAt(col, row) {
+  return Object.keys(ANCHORS).find((name) => ANCHORS[name].col === col && ANCHORS[name].row === row);
+}
+
+// Смещение рамки по оси: index 0 — в начало, 1 — по центру, 2 — в конец
+// свободного места (free = длина стороны исходника минус сторона квадрата).
+function axisOffset(index, free) {
+  return Math.round((free * index) / 2);
+}
+
 function computeCropBox(anchor, w, h) {
   const side = Math.min(w, h);
-  const x = anchor === "left" ? 0 : anchor === "right" ? w - side : (w - side) / 2;
-  const y = anchor === "top" ? 0 : anchor === "bottom" ? h - side : (h - side) / 2;
-  return { x: Math.round(x), y: Math.round(y), side };
+  const { col, row } = ANCHORS[anchor];
+  return { x: axisOffset(col, w - side), y: axisOffset(row, h - side), side };
+}
+
+// Квадрат со стороной min(w, h) сдвигается только по длинной оси, поэтому
+// для конкретной картинки якорь сводится к одной из трёх позиций:
+// у горизонтальной важна колонка, у вертикальной — ряд, у квадратной — ничего.
+function effectiveAnchor(anchor, w, h) {
+  const { col, row } = ANCHORS[anchor];
+  if (w > h) return anchorAt(col, 1);
+  if (h > w) return anchorAt(1, row);
+  return "center";
 }
 
 function clamp(value, min, max) {
@@ -172,7 +216,7 @@ function clamp(value, min, max) {
 
 function applyAnchor() {
   if (!state.image) return;
-  state.crop = computeCropBox(anchorSelect.value, state.width, state.height);
+  state.crop = computeCropBox(anchorPref, state.width, state.height);
   updateOverlay();
   scheduleSizeEstimate();
 }
@@ -187,9 +231,86 @@ function updateOverlay() {
   cropOverlay.style.height = `${(side / state.height) * 100}%`;
 
   updateOutputInfo();
+  updateAnchorUI();
 }
 
-anchorSelect.addEventListener("change", applyAnchor);
+function updateAnchorUI() {
+  const { width: w, height: h, crop, manual } = state;
+  const isSquare = w === h;
+  const current = effectiveAnchor(anchorPref, w, h);
+
+  anchorButtons.forEach((btn) => {
+    const name = btn.dataset.anchor;
+    const pressed = !manual && name === anchorPref;
+    btn.setAttribute("aria-pressed", String(pressed));
+    btn.classList.toggle(
+      "is-equivalent",
+      !manual && !pressed && !isSquare && effectiveAnchor(name, w, h) === current
+    );
+    btn.disabled = isSquare;
+  });
+
+  // Точка показывает фактическое положение рамки, когда ни один якорь не подходит.
+  anchorMarker.hidden = !manual;
+  if (manual) {
+    const freeX = w - crop.side;
+    const freeY = h - crop.side;
+    anchorMarker.style.setProperty("--fx", freeX ? crop.x / freeX : 0.5);
+    anchorMarker.style.setProperty("--fy", freeY ? crop.y / freeY : 0.5);
+  }
+
+  let caption;
+  if (isSquare) {
+    caption = "Изображение уже квадратное — обрезать нечего";
+  } else if (manual) {
+    caption = "Вручную";
+  } else if (current === anchorPref) {
+    caption = ANCHORS[anchorPref].label;
+  } else {
+    caption = `${ANCHORS[anchorPref].label} — для этого изображения как «${ANCHORS[current].label}»`;
+  }
+  // Подпись — aria-live: трогаем её, только когда текст правда изменился,
+  // а не на каждое движение рамки.
+  if (anchorCaption.textContent !== caption) anchorCaption.textContent = caption;
+}
+
+anchorButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    anchorPref = btn.dataset.anchor;
+    state.manual = false;
+    applyAnchor();
+  });
+});
+
+// Берём ближайшую позицию якоря, а не первую попавшую в допуск: у почти
+// квадратной картинки окна допуска соседних позиций перекрываются.
+function snapToAnchor(value, free, tolerance) {
+  let nearest = value;
+  let best = Infinity;
+  for (let index = 0; index <= 2; index++) {
+    const target = axisOffset(index, free);
+    const distance = Math.abs(value - target);
+    if (distance < best) {
+      best = distance;
+      nearest = target;
+    }
+  }
+  return best <= tolerance ? nearest : value;
+}
+
+// После ручного сдвига: если рамка стоит на позиции якоря, выбираем его,
+// иначе — режим «Вручную». У якоря меняется только подвижная ось, вторая
+// сохраняется: «сверху слева», дотащенное до правого края, станет «сверху справа».
+function syncAnchorWithCrop() {
+  const { width: w, height: h, crop } = state;
+  const { col, row } = ANCHORS[anchorPref];
+  const free = Math.abs(w - h);
+  const pos = w > h ? crop.x : crop.y;
+  const index = [0, 1, 2].find((i) => axisOffset(i, free) === pos);
+
+  state.manual = index === undefined;
+  if (!state.manual) anchorPref = w > h ? anchorAt(index, row) : anchorAt(col, index);
+}
 
 // Ручное перемещение рамки по превью. Координаты указателя переводятся
 // в пиксели исходного изображения через масштаб отображаемого превью.
@@ -210,8 +331,11 @@ previewFrame.addEventListener("pointerdown", (e) => {
 previewFrame.addEventListener("pointermove", (e) => {
   if (!drag || e.pointerId !== drag.pointerId) return;
   const { startCrop, scale } = drag;
-  const x = clamp(Math.round(startCrop.x + (e.clientX - drag.startX) * scale), 0, state.width - startCrop.side);
-  const y = clamp(Math.round(startCrop.y + (e.clientY - drag.startY) * scale), 0, state.height - startCrop.side);
+  const freeX = state.width - startCrop.side;
+  const freeY = state.height - startCrop.side;
+  const tolerance = SNAP_PX * scale;
+  const x = snapToAnchor(clamp(Math.round(startCrop.x + (e.clientX - drag.startX) * scale), 0, freeX), freeX, tolerance);
+  const y = snapToAnchor(clamp(Math.round(startCrop.y + (e.clientY - drag.startY) * scale), 0, freeY), freeY, tolerance);
   if (x === state.crop.x && y === state.crop.y) return;
 
   if (!drag.moved) {
@@ -219,7 +343,7 @@ previewFrame.addEventListener("pointermove", (e) => {
     invalidateSizeEstimate();
   }
   state.crop = { x, y, side: startCrop.side };
-  anchorSelect.value = "custom";
+  syncAnchorWithCrop();
   updateOverlay();
 });
 
@@ -280,7 +404,8 @@ function baseNameOf(fileName) {
 
 function outputFileName() {
   const exportType = pickExportType(state.file.type);
-  return `${baseNameOf(state.file.name)}_square_${anchorSelect.value}.${extensionFor(exportType)}`;
+  const suffix = state.manual ? "custom" : effectiveAnchor(anchorPref, state.width, state.height);
+  return `${baseNameOf(state.file.name)}_square_${suffix}.${extensionFor(exportType)}`;
 }
 
 // Кодирует текущую область обрезки в файл. Используется и для скачивания,

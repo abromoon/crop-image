@@ -75,34 +75,90 @@
 </header>
 
 <main class="app">
-  <header class="app__header">
-    <h1>Обрезка изображения в квадрат</h1>
-    <p class="app__subtitle">
-      Перетащите изображение, выберите якорь или передвиньте рамку на превью и сохраните результат.
-      Всё происходит прямо в браузере — изображение никуда не отправляется и нигде не сохраняется.
-    </p>
-  </header>
+  <section id="start" class="start">
+    <header class="app__header">
+      <h1>Обрезка изображения в квадрат</h1>
+      <p class="app__subtitle">
+        Перетащите изображение, выберите якорь или передвиньте рамку на превью и сохраните результат.
+        Всё происходит прямо в браузере — изображение никуда не отправляется и нигде не сохраняется.
+      </p>
+    </header>
 
-  <section id="dropzone" class="dropzone" tabindex="0" aria-label="Область для перетаскивания изображения">
-    <input type="file" id="file-input" accept="image/*" hidden>
-    <div class="dropzone__content">
-      <svg class="dropzone__icon" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-        <path fill="currentColor" d="M12 16a1 1 0 0 1-1-1V6.41L7.71 9.71a1 1 0 1 1-1.42-1.42l5-5a1 1 0 0 1 1.42 0l5 5a1 1 0 1 1-1.42 1.42L13 6.41V15a1 1 0 0 1-1 1z"/>
-        <path fill="currentColor" d="M5 18a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/>
-      </svg>
-      <p><strong>Перетащите изображение сюда</strong></p>
-      <p class="dropzone__hint">или <button type="button" id="browse-btn" class="link-btn">выберите файл</button></p>
-    </div>
+    <section id="dropzone" class="dropzone" tabindex="0" aria-label="Область для перетаскивания изображения">
+      <input type="file" id="file-input" accept="image/*" hidden>
+      <div class="dropzone__content">
+        <svg class="dropzone__icon" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+          <path fill="currentColor" d="M12 16a1 1 0 0 1-1-1V6.41L7.71 9.71a1 1 0 1 1-1.42-1.42l5-5a1 1 0 0 1 1.42 0l5 5a1 1 0 1 1-1.42 1.42L13 6.41V15a1 1 0 0 1-1 1z"/>
+          <path fill="currentColor" d="M5 18a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/>
+        </svg>
+        <p><strong>Перетащите изображение сюда</strong></p>
+        <p class="dropzone__hint">или <button type="button" id="browse-btn" class="link-btn">выберите файл</button></p>
+      </div>
+    </section>
   </section>
 
   <section id="editor" class="editor" hidden>
-    <div class="editor__preview-wrap">
+    <aside class="editor__tools panel" aria-label="Инструменты">
+      <section class="tool">
+        <div class="field">
+          <span class="field__label" id="anchor-label">Якорь обрезки</span>
+          <div class="anchor-picker">
+            <div class="anchor-grid" role="group" aria-labelledby="anchor-label">
+              <button type="button" data-anchor="top-left" title="Сверху слева" aria-label="Сверху слева" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M17 17L7 7M7 17V7h10"/></svg>
+              </button>
+              <button type="button" data-anchor="top" title="Сверху" aria-label="Сверху" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              </button>
+              <button type="button" data-anchor="top-right" title="Сверху справа" aria-label="Сверху справа" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 17L17 7M7 7h10v10"/></svg>
+              </button>
+              <button type="button" data-anchor="left" title="Слева" aria-label="Слева" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+              </button>
+              <button type="button" data-anchor="center" title="По центру" aria-label="По центру" aria-pressed="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg>
+              </button>
+              <button type="button" data-anchor="right" title="Справа" aria-label="Справа" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+              <button type="button" data-anchor="bottom-left" title="Снизу слева" aria-label="Снизу слева" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M17 7L7 17M7 7v10h10"/></svg>
+              </button>
+              <button type="button" data-anchor="bottom" title="Снизу" aria-label="Снизу" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+              </button>
+              <button type="button" data-anchor="bottom-right" title="Снизу справа" aria-label="Снизу справа" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 7l10 10M17 7v10H7"/></svg>
+              </button>
+              <span id="anchor-marker" class="anchor-grid__marker" hidden></span>
+            </div>
+            <p id="anchor-caption" class="anchor-caption" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <div class="editor__stage">
       <div id="preview-frame" class="preview-frame">
         <img id="preview-img" alt="Предпросмотр изображения" draggable="false">
         <div id="crop-overlay" class="crop-overlay" aria-hidden="true"></div>
       </div>
 
-      <aside class="info-panel" aria-label="Информация об изображении">
+      <div class="editor__actions">
+        <button type="button" id="reset-btn" class="btn btn--ghost" title="Выбрать другое изображение">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8M3 3v5h5"/></svg>
+          Другое
+        </button>
+        <button type="button" id="confirm-btn" class="btn btn--primary" title="Подтвердить и скачать">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          Скачать
+        </button>
+      </div>
+    </div>
+
+    <aside class="editor__info" aria-label="Информация об изображении">
+      <div class="info-panel panel">
         <section class="info-panel__section">
           <h2 class="info-panel__title">Исходное</h2>
           <dl class="info-list">
@@ -126,35 +182,15 @@
             <dt>Вес</dt><dd data-info="out-bytes"></dd>
           </dl>
         </section>
-      </aside>
-    </div>
-
-    <div class="editor__controls">
-      <label class="field">
-        <span class="field__label">Якорь обрезки</span>
-        <select id="anchor-select" class="select">
-          <option value="top">Сверху</option>
-          <option value="center" selected>По центру</option>
-          <option value="bottom">Снизу</option>
-          <option value="left">Слева</option>
-          <option value="right">Справа</option>
-          <option value="custom" hidden disabled>Вручную</option>
-        </select>
-      </label>
-
-      <p id="format-note" class="format-note" hidden></p>
-
-      <div class="editor__actions">
-        <button type="button" id="reset-btn" class="btn btn--ghost">Другое изображение</button>
-        <button type="button" id="confirm-btn" class="btn btn--primary">Подтвердить и скачать</button>
       </div>
-    </div>
+      <p id="format-note" class="format-note" hidden></p>
+    </aside>
   </section>
-
-  <footer class="app__footer">
-    <p>Обработка происходит локально в браузере. Файлы не загружаются на сервер и не сохраняются между сеансами.</p>
-  </footer>
 </main>
+
+<footer class="site-footer">
+  <p>Обработка происходит локально в браузере. Файлы не загружаются на сервер и не сохраняются между сеансами.</p>
+</footer>
 
 <script src="app.js"></script>
 </body>
