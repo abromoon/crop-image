@@ -283,11 +283,8 @@ body {
   color: var(--accent);
 }
 
-.service-menu__soon {
-  margin: 0;
-  padding: 8px 10px 4px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
+.service-menu__list a:not([aria-current="page"]) .service-menu__check {
+  visibility: hidden;
 }
 
 @media (max-width: 420px) {
@@ -486,7 +483,9 @@ body {
   gap: 16px;
 }
 
-.tool + .tool {
+/* Разделитель между видимыми инструментами (часть из них скрыта
+   в зависимости от сервиса и пресета). */
+.tool:not([hidden]) ~ .tool:not([hidden]) {
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
@@ -549,6 +548,113 @@ body {
   transition: none;
 }
 
+/* Ручки свободной рамки (логотип Steam). Лежат внутри рамки: у
+   .preview-frame overflow: hidden, снаружи их обрезало бы у края картинки.
+   Хит-зона больше видимой части — чтобы попасть пальцем. */
+.crop-handle {
+  display: none;
+  position: absolute;
+  --hit: 24px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.crop-overlay--resizable .crop-handle {
+  display: block;
+}
+
+.crop-handle::after {
+  content: "";
+  position: absolute;
+  border: 0 solid var(--overlay-line);
+}
+
+.crop-handle[data-handle="nw"],
+.crop-handle[data-handle="ne"],
+.crop-handle[data-handle="se"],
+.crop-handle[data-handle="sw"] {
+  z-index: 1;
+  width: var(--hit);
+  height: var(--hit);
+}
+
+/* Углы — уголки-скобки. */
+.crop-handle[data-handle="nw"],
+.crop-handle[data-handle="nw"]::after { top: 0; left: 0; }
+.crop-handle[data-handle="ne"],
+.crop-handle[data-handle="ne"]::after { top: 0; right: 0; }
+.crop-handle[data-handle="se"],
+.crop-handle[data-handle="se"]::after { bottom: 0; right: 0; }
+.crop-handle[data-handle="sw"],
+.crop-handle[data-handle="sw"]::after { bottom: 0; left: 0; }
+
+.crop-handle[data-handle="nw"]::after,
+.crop-handle[data-handle="ne"]::after,
+.crop-handle[data-handle="se"]::after,
+.crop-handle[data-handle="sw"]::after {
+  width: 14px;
+  height: 14px;
+}
+
+.crop-handle[data-handle="nw"]::after { border-width: 4px 0 0 4px; }
+.crop-handle[data-handle="ne"]::after { border-width: 4px 4px 0 0; }
+.crop-handle[data-handle="se"]::after { border-width: 0 4px 4px 0; }
+.crop-handle[data-handle="sw"]::after { border-width: 0 0 4px 4px; }
+
+.crop-handle[data-handle="nw"],
+.crop-handle[data-handle="se"] {
+  cursor: nwse-resize;
+}
+
+.crop-handle[data-handle="ne"],
+.crop-handle[data-handle="sw"] {
+  cursor: nesw-resize;
+}
+
+/* Стороны — полосы между углами с короткой планкой посередине. */
+.crop-handle[data-handle="n"],
+.crop-handle[data-handle="s"] {
+  left: var(--hit);
+  right: var(--hit);
+  height: calc(var(--hit) * 0.67);
+  cursor: ns-resize;
+}
+
+.crop-handle[data-handle="e"],
+.crop-handle[data-handle="w"] {
+  top: var(--hit);
+  bottom: var(--hit);
+  width: calc(var(--hit) * 0.67);
+  cursor: ew-resize;
+}
+
+.crop-handle[data-handle="n"] { top: 0; }
+.crop-handle[data-handle="s"] { bottom: 0; }
+.crop-handle[data-handle="e"] { right: 0; }
+.crop-handle[data-handle="w"] { left: 0; }
+
+.crop-handle[data-handle="n"]::after,
+.crop-handle[data-handle="s"]::after {
+  left: 50%;
+  width: 20px;
+  transform: translateX(-50%);
+  border-top-width: 4px;
+}
+
+.crop-handle[data-handle="n"]::after { top: 0; }
+.crop-handle[data-handle="s"]::after { bottom: 0; }
+
+.crop-handle[data-handle="e"]::after,
+.crop-handle[data-handle="w"]::after {
+  top: 50%;
+  height: 20px;
+  transform: translateY(-50%);
+  border-left-width: 4px;
+}
+
+.crop-handle[data-handle="e"]::after { right: 0; }
+.crop-handle[data-handle="w"]::after { left: 0; }
+
 .info-panel {
   display: flex;
   flex-direction: column;
@@ -587,6 +693,15 @@ body {
   margin: 0;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+
+/* Обёртка пары dt/dd, которую надо прятать целиком; сама в сетке не участвует. */
+.info-list__row {
+  display: contents;
+}
+
+.info-list__row[hidden] {
+  display: none;
 }
 
 .field {
@@ -684,6 +799,105 @@ body {
   display: none;
 }
 
+/* Тип изображения Steam: 2×2 кнопки в стиле сетки якорей,
+   в каждой — силуэт нужных пропорций. */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.preset-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.preset-grid button:hover {
+  color: var(--text);
+}
+
+.preset-grid button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.preset-grid button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.preset-grid__shape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  margin-bottom: 2px;
+}
+
+.preset-grid__shape > span {
+  width: var(--w);
+  height: var(--h);
+  border: 2px solid currentColor;
+  border-radius: 3px;
+}
+
+.preset-grid__shape--free > span {
+  border-style: dashed;
+}
+
+.preset-grid__name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.preset-grid__size {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tool-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.tool-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.btn--small {
+  gap: 6px;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .anchor-caption {
   margin: 0;
   font-size: 0.85rem;
@@ -741,7 +955,7 @@ body {
   border: 1px solid var(--border);
 }
 
-.btn--ghost:hover {
+.btn--ghost:hover:not(:disabled) {
   color: var(--text);
   border-color: var(--text-muted);
 }

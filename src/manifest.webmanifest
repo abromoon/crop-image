@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "SNIP — Обрезка в квадрат",
+  "name": "SNIP — обработка изображений",
   "short_name": "SNIP",
-  "description": "Обрезка изображения в квадрат прямо в браузере",
+  "description": "Обрезка изображения в квадрат и под обложки Steam прямо в браузере",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",
@@ -13,6 +13,10 @@
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Обрезка в квадрат", "url": "./#square", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Обложки Steam", "url": "./#steam", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ],
   "file_handlers": [
     {
