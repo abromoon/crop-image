@@ -20,6 +20,10 @@ const ratioHint = document.getElementById("ratio-hint");
 const presetTool = document.getElementById("preset-tool");
 const presetButtons = document.querySelectorAll("[data-preset]");
 const anchorTool = document.getElementById("anchor-tool");
+const avatarTool = document.getElementById("avatar-tool");
+const avatarSize = document.getElementById("avatar-size");
+const avatarHint = document.getElementById("avatar-hint");
+const avatarPreview = document.getElementById("avatar-preview");
 const logoTool = document.getElementById("logo-tool");
 const logoCaption = document.getElementById("logo-caption");
 const trimBtn = document.getElementById("trim-btn");
@@ -69,7 +73,7 @@ const STEAM_EXPORTABLE_TYPES = new Set(["image/png", "image/jpeg"]);
 // Логотип — только PNG: у него прозрачный фон.
 const ALPHA_EXPORTABLE_TYPES = new Set(["image/png"]);
 
-// Сервисы из меню в шапке. Выбираются hash'ем (#ratio, #steam) в одном
+// Сервисы из меню в шапке. Выбираются hash'ем (#ratio, #steam, #avatar) в одном
 // документе: sw.js отдаёт index.html на любую навигацию, а смена hash не
 // перезагружает страницу — открытая картинка переживает переключение.
 // Пустой или неизвестный hash (в том числе старый #square) — первый сервис.
@@ -88,6 +92,13 @@ const SERVICES = {
     subtitle:
       "Перетащите изображение и выберите, что из него сделать: основное изображение, фон, логотип или широкое изображение. Пропорции подбираются сами, пиксели не масштабируются.",
   },
+  avatar: {
+    label: "Аватары",
+    title: "Аватары — SNIP",
+    heading: "Обрезка аватара",
+    subtitle:
+      "Перетащите изображение: рамка всегда квадратная. Задайте её размер в пикселях или потяните за угол, выберите якорь или передвиньте рамку — рядом сразу видно, как аватар будет выглядеть в разных размерах и скруглениях. Пиксели не масштабируются.",
+  },
 };
 
 // Пресеты Steam. ratio — пропорции рамки максимального размера (null —
@@ -97,7 +108,7 @@ const SERVICES = {
 const STEAM_PRESETS = {
   "steam-capsule": { ratio: [600, 900], suffix: "steam_capsule", target: [600, 900], exportTypes: STEAM_EXPORTABLE_TYPES },
   "steam-hero": { ratio: [3840, 1240], suffix: "steam_hero", target: [3840, 1240], exportTypes: STEAM_EXPORTABLE_TYPES },
-  "steam-logo": { ratio: null, suffix: "steam_logo", target: [1280, 720], exportTypes: ALPHA_EXPORTABLE_TYPES },
+  "steam-logo": { ratio: null, suffix: "steam_logo", target: [1280, 720], exportTypes: ALPHA_EXPORTABLE_TYPES, resize: "free" },
   "steam-wide": { ratio: [920, 430], suffix: "steam_wide", target: [920, 430], exportTypes: STEAM_EXPORTABLE_TYPES },
 };
 
@@ -144,6 +155,9 @@ let service = "ratio";
 let anchorPref = "center";
 let ratioPref = [1, 1]; // [ширина, высота]
 let presetPref = "steam-capsule";
+// Сторона квадратной рамки аватара в px исходника; null — максимальная.
+// Меняется только ресайзом (поле размера, угол рамки), перемещение её не трогает.
+let avatarSide = null;
 
 // Текущее перетаскивание рамки (null, если не тащим).
 let drag = null;
@@ -160,6 +174,7 @@ function resetState() {
   clearTimeout(sizeTimer);
   sizeSeq++;
   state = { file: null, objectUrl: null, image: null, width: 0, height: 0, crop: null, manual: false, opaque: null };
+  avatarPreview.style.removeProperty("--av-img");
   fileInput.value = "";
   editor.hidden = true;
   startScreen.hidden = false;
@@ -230,8 +245,10 @@ function loadFile(file) {
     state.width = img.naturalWidth;
     state.height = img.naturalHeight;
     state.opaque = null;
+    avatarSide = null;
 
     previewImg.src = objectUrl;
+    avatarPreview.style.setProperty("--av-img", `url("${objectUrl}")`);
 
     updateSourceInfo();
     applyPreset();
@@ -262,6 +279,12 @@ function axisOffset(index, free) {
 // пропорций (userRatio — их же показываем в инфо как заданные).
 function currentPreset() {
   if (service === "steam") return STEAM_PRESETS[presetPref];
+  // resize: "square" — рамка 1:1 любого размера, тянется за углы; имя файла
+  // без якоря, зато с размером (рамка не максимальная, якорь не всё решает).
+  if (service === "avatar") {
+    const side = state.crop ? state.crop.w : 0;
+    return { ratio: [1, 1], suffix: `avatar_${side}`, exportTypes: CANVAS_EXPORTABLE_TYPES, resize: "square", noAnchorSuffix: true };
+  }
   return { ratio: ratioPref, suffix: ratioSlug(), exportTypes: CANVAS_EXPORTABLE_TYPES, userRatio: true };
 }
 
@@ -274,8 +297,9 @@ function fitRatio([rw, rh], w, h) {
   return { w, h: Math.max(1, Math.round((w * rh) / rw)) };
 }
 
-function computeCropBox(anchor, w, h, ratio) {
-  const size = fitRatio(ratio, w, h);
+// side — сторона квадрата (аватар); без неё рамка максимального размера.
+function computeCropBox(anchor, w, h, ratio, side = null) {
+  const size = side ? { w: clamp(side, 1, Math.min(w, h)), h: clamp(side, 1, Math.min(w, h)) } : fitRatio(ratio, w, h);
   const { col, row } = ANCHORS[anchor];
   return { x: axisOffset(col, w - size.w), y: axisOffset(row, h - size.h), ...size };
 }
@@ -360,7 +384,7 @@ function applyPreset() {
   const preset = currentPreset();
   state.manual = false;
   state.crop = preset.ratio
-    ? computeCropBox(anchorPref, state.width, state.height, preset.ratio)
+    ? computeCropBox(anchorPref, state.width, state.height, preset.ratio, service === "avatar" ? avatarSide : null)
     : { ...opaqueBounds() };
   updateFormatNote();
   updateOverlay();
@@ -375,15 +399,17 @@ function setCrop(crop) {
 
 function updateToolsUI() {
   const preset = currentPreset();
-  const steam = service === "steam";
-  ratioTool.hidden = steam;
-  presetTool.hidden = !steam;
+  ratioTool.hidden = service !== "ratio";
+  presetTool.hidden = service !== "steam";
+  avatarTool.hidden = service !== "avatar";
+  avatarPreview.hidden = service !== "avatar";
   presetButtons.forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.preset === presetPref));
   });
   anchorTool.hidden = !preset.ratio;
   logoTool.hidden = Boolean(preset.ratio);
-  cropOverlay.classList.toggle("crop-overlay--resizable", !preset.ratio);
+  cropOverlay.classList.toggle("crop-overlay--resizable", Boolean(preset.resize));
+  cropOverlay.classList.toggle("crop-overlay--square", preset.resize === "square");
   targetInfo.hidden = !preset.target;
 }
 
@@ -397,6 +423,7 @@ function updateOverlay() {
   cropOverlay.style.height = `${(h / state.height) * 100}%`;
 
   updateOutputInfo();
+  if (service === "avatar") updateAvatarUI();
   if (currentPreset().ratio) {
     updateAnchorUI();
   } else {
@@ -408,7 +435,10 @@ function updateAnchorUI() {
   const { manual } = state;
   const free = freeSpace();
   const nothingToCrop = free.x === 0 && free.y === 0;
-  const current = effectiveAnchor(anchorPref, free);
+  // У аватара рамка может быть меньше максимума и свободны обе оси, так что
+  // «эквивалентных» якорей нет — нажата клетка, на позиции которой стоит рамка.
+  const avatar = service === "avatar";
+  const current = avatar ? anchorPref : effectiveAnchor(anchorPref, free);
 
   anchorButtons.forEach((btn) => {
     const name = btn.dataset.anchor;
@@ -416,7 +446,7 @@ function updateAnchorUI() {
     btn.setAttribute("aria-pressed", String(pressed));
     btn.classList.toggle(
       "is-equivalent",
-      !manual && !pressed && !nothingToCrop && effectiveAnchor(name, free) === current
+      !avatar && !manual && !pressed && !nothingToCrop && effectiveAnchor(name, free) === current
     );
     btn.disabled = nothingToCrop;
   });
@@ -431,7 +461,9 @@ function updateAnchorUI() {
 
   let caption;
   if (nothingToCrop) {
-    caption = "Изображение уже нужных пропорций — обрезать нечего";
+    caption = avatar
+      ? "Рамка занимает всё изображение — уменьшите её, чтобы выбрать якорь"
+      : "Изображение уже нужных пропорций — обрезать нечего";
   } else if (manual) {
     caption = "Вручную";
   } else if (current === anchorPref) {
@@ -499,6 +531,46 @@ ratioCustom.addEventListener("input", () => {
 ratioSelect.value = "1:1";
 updateRatioUI();
 
+// Поле размера и превью аватара. Фон плиток — CSS поверх object URL: размеры
+// и позиция в процентах от стороны плитки, так что они подходят любому размеру.
+function updateAvatarUI() {
+  const { crop, width, height } = state;
+  const max = Math.min(width, height);
+  avatarSize.max = max;
+  if (document.activeElement !== avatarSize) avatarSize.value = crop.w;
+  const hint = `Сторона квадрата в пикселях исходника, от 1 до ${max}. Рамку можно тянуть за углы и двигать на превью.`;
+  if (avatarHint.textContent !== hint) avatarHint.textContent = hint;
+
+  const place = (offset, total) => (total > crop.w ? (offset / (total - crop.w)) * 100 : 0);
+  avatarPreview.style.setProperty("--av-w", `${(width / crop.w) * 100}%`);
+  avatarPreview.style.setProperty("--av-h", `${(height / crop.w) * 100}%`);
+  avatarPreview.style.setProperty("--av-x", `${place(crop.x, width)}%`);
+  avatarPreview.style.setProperty("--av-y", `${place(crop.y, height)}%`);
+}
+
+// Размер меняется вокруг центра рамки, пока она помещается в изображение.
+avatarSize.addEventListener("input", () => {
+  if (!state.crop || !avatarSize.checkValidity()) return;
+  const side = clamp(avatarSize.valueAsNumber, 1, Math.min(state.width, state.height));
+  const { x, y, w } = state.crop;
+  invalidateSizeEstimate();
+  avatarSide = side;
+  state.crop = {
+    x: clamp(Math.round(x + (w - side) / 2), 0, state.width - side),
+    y: clamp(Math.round(y + (w - side) / 2), 0, state.height - side),
+    w: side,
+    h: side,
+  };
+  syncAnchorWithCrop();
+  updateOverlay();
+  scheduleSizeEstimate();
+});
+
+// Уходя из поля, возвращаем в него фактическое значение (если ввели лишнее).
+avatarSize.addEventListener("change", () => {
+  if (state.crop) avatarSize.value = state.crop.w;
+});
+
 anchorButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     anchorPref = btn.dataset.anchor;
@@ -544,6 +616,18 @@ function syncAnchorWithCrop() {
   const { crop } = state;
   const { col, row } = ANCHORS[anchorPref];
   const free = freeSpace();
+
+  if (service === "avatar") {
+    // Свободны обе оси: якорь — только если рамка стоит ровно на позиции клетки.
+    const found = Object.keys(ANCHORS).find(
+      (name) =>
+        axisOffset(ANCHORS[name].col, free.x) === crop.x && axisOffset(ANCHORS[name].row, free.y) === crop.y
+    );
+    state.manual = !found;
+    if (found) anchorPref = found;
+    return;
+  }
+
   const horizontal = free.x > 0;
   const pos = horizontal ? crop.x : crop.y;
   const size = horizontal ? free.x : free.y;
@@ -559,7 +643,10 @@ function syncAnchorWithCrop() {
 previewFrame.addEventListener("pointerdown", (e) => {
   if (!state.crop || e.button !== 0) return;
   e.preventDefault();
-  const handle = currentPreset().ratio ? null : e.target.closest("[data-handle]");
+  const resize = currentPreset().resize;
+  let handle = resize ? e.target.closest("[data-handle]") : null;
+  // У квадратной рамки работают только угловые ручки; за боковые рамка просто двигается.
+  if (resize === "square" && handle && handle.dataset.handle.length !== 2) handle = null;
   drag = {
     pointerId: e.pointerId,
     startX: e.clientX,
@@ -567,6 +654,7 @@ previewFrame.addEventListener("pointerdown", (e) => {
     startCrop: { ...state.crop },
     scale: state.width / previewImg.getBoundingClientRect().width,
     edges: handle ? handle.dataset.handle : null, // например "nw" — двигаются верхний и левый края
+    square: resize === "square",
   };
   previewFrame.setPointerCapture(e.pointerId);
   previewFrame.classList.add("preview-frame--dragging");
@@ -606,9 +694,28 @@ function resizedCrop(e) {
   return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
+// Квадрат тянется за угол: противоположный угол неподвижен, сторона — среднее
+// смещений по обеим осям. Не выходит за изображение и прилипает к максимуму.
+function squareResizedCrop(e) {
+  const { startCrop, scale, edges } = drag;
+  const { width: W, height: H } = state;
+  const sx = edges.includes("e") ? 1 : -1;
+  const sy = edges.includes("s") ? 1 : -1;
+  // Неподвижный угол.
+  const fx = sx > 0 ? startCrop.x : startCrop.x + startCrop.w;
+  const fy = sy > 0 ? startCrop.y : startCrop.y + startCrop.h;
+  const limit = Math.min(sx > 0 ? W - fx : fx, sy > 0 ? H - fy : fy);
+  const min = Math.min(limit, Math.max(1, Math.round(MIN_FRAME_PX * scale)));
+  const dx = (e.clientX - drag.startX) * scale;
+  const dy = (e.clientY - drag.startY) * scale;
+  const wanted = Math.round((startCrop.w + sx * dx + startCrop.h + sy * dy) / 2);
+  const side = clamp(snapTo(wanted, [limit], SNAP_PX * scale), min, limit);
+  return { x: sx > 0 ? fx : fx - side, y: sy > 0 ? fy : fy - side, w: side, h: side };
+}
+
 previewFrame.addEventListener("pointermove", (e) => {
   if (!drag || e.pointerId !== drag.pointerId) return;
-  const crop = drag.edges ? resizedCrop(e) : movedCrop(e);
+  const crop = drag.edges ? (drag.square ? squareResizedCrop(e) : resizedCrop(e)) : movedCrop(e);
   if (sameBox(crop, state.crop)) return;
 
   if (!drag.moved) {
@@ -616,6 +723,7 @@ previewFrame.addEventListener("pointermove", (e) => {
     invalidateSizeEstimate();
   }
   state.crop = crop;
+  if (drag.square) avatarSide = crop.w;
   if (currentPreset().ratio) syncAnchorWithCrop();
   updateOverlay();
 });
@@ -696,7 +804,7 @@ function outputFileName() {
   const preset = currentPreset();
   const exportType = pickExportType(state.file.type);
   let suffix = preset.suffix;
-  if (preset.ratio) suffix += `_${state.manual ? "custom" : effectiveAnchor(anchorPref, freeSpace())}`;
+  if (preset.ratio && !preset.noAnchorSuffix) suffix += `_${state.manual ? "custom" : effectiveAnchor(anchorPref, freeSpace())}`;
   return `${baseNameOf(state.file.name)}_${suffix}.${extensionFor(exportType)}`;
 }
 
@@ -923,7 +1031,9 @@ const serviceLinks = serviceMenu.querySelectorAll("[data-service]");
 
 function applyService() {
   const name = location.hash.slice(1);
-  service = Object.hasOwn(SERVICES, name) ? name : "ratio";
+  const next = Object.hasOwn(SERVICES, name) ? name : "ratio";
+  if (next !== service) avatarSide = null;
+  service = next;
   const config = SERVICES[service];
 
   document.title = config.title;
