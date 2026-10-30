@@ -13,7 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 пропорциям: квадрат, форматы обоев рабочего стола или свои; CLI — в квадрат) с
 выбором якоря (сверху / по центру / снизу / слева / справа): статическая веб-страница для GitHub Pages
 (папка `src/`: `index.html` + `style.css` + `app.js`) и отдельный CLI-скрипт на Python
-(`crop_image.py`). Между ними нет общего кода и зависимостей — это две разные
+(`crop_image.py`). Веб-версия, кроме обрезки по пропорциям, умеет второй сервис —
+обложки для библиотеки Steam (основное, фон, логотип, широкое); в CLI его нет.
+Между ними нет общего кода и зависимостей — это две разные
 реализации одной идеи, живущие в одном репозитории.
 
 Ключевое инвариант веб-версии: изображение никогда не покидает браузер — нет
@@ -45,6 +47,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Состояние приложения — единственный объект `state` (файл, object URL,
   загруженный `HTMLImageElement`, размеры). UI переключается между двумя
   секциями: `#start` (заголовок + `#dropzone`, выбор файла) и `#editor`.
+- Сервисы (`SERVICES`: «Обрезка по пропорциям» и «Обложки Steam») — это один
+  документ, выбор по hash: `#ratio` (и пустой/неизвестный hash, в том числе
+  старый `#square`) или `#steam`. Отдельный `.html` не годится: `sw.js` отдаёт
+  `index.html` на любую навигацию. `applyService()` (на старте и по
+  `hashchange`) меняет `document.title`, заголовок стартового экрана,
+  `summary` меню и `aria-current` у ссылок; смена hash не перезагружает
+  страницу, поэтому открытая картинка переживает переключение. Новый сервис =
+  запись в `SERVICES` + ссылка `href="#name" data-service="name"` в меню.
+- Пресет рамки возвращает `currentPreset()`, у обоих сервисов одной формы:
+  `ratio` — пропорции рамки максимального размера (`null` у логотипа —
+  свободная рамка), `suffix` для имени файла, `exportTypes` — какие форматы
+  сохраняются как есть, `target` — рекомендуемый размер Steam (только справка
+  в инфо, результат **никогда не масштабируется**), `userRatio` — пропорции
+  выбраны пользователем. В сервисе «по пропорциям» пресет собирается на лету
+  из `ratioPref`, в Steam — `STEAM_PRESETS[presetPref]` (`presetPref`, как и
+  `anchorPref`, вне `state` и только в памяти). Всё пересчитывает
+  `applyPreset()`; видимость инструментов (`#ratio-tool`, `#preset-tool`,
+  `#anchor-tool`, `#logo-tool`) — `updateToolsUI()`.
 - Раскладка `#editor` — CSS Grid из трёх зон: `.editor__tools` (слева,
   инструменты обрезки; новый инструмент = новая `.tool` в этой колонке),
   `.editor__stage` (центр: превью и под ним кнопки «Другое»/«Скачать»,
@@ -66,7 +86,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `state.crop` (`{ x, y, w, h }` в пикселях исходника) — единственный источник
   истины для области обрезки: из него рисуется оверлей (`updateOverlay`) и
   делается реальная обрезка при экспорте. Заполняется двумя путями:
-  `applyAnchor()` при выборе якоря/пропорций (через
+  `applyPreset()` при выборе якоря/пропорций/сервиса (через
   `computeCropBox(anchor, w, h, ratio)`) и ручным перетаскиванием рамки
   (Pointer Events на `#preview-frame`).
 - Якорь выбирается сеткой 3×3 кнопок `[data-anchor]` (таблица `ANCHORS`,
@@ -84,6 +104,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   только подвижную ось (ряд/колонка второй оси сохраняются), либо ставит
   `state.manual` — режим «Вручную»: ни одна кнопка не нажата, в сетке видна
   точка `#anchor-marker` с фактическим положением рамки, суффикс файла `custom`.
+- Логотип Steam (`ratio: null`): стартовая рамка — `opaqueBounds()`, границы
+  пикселей с `alpha > 0` (читаются через `getImageData` один раз, кэш в
+  `state.opaque`; у JPEG не читаются). Рамку можно тянуть за 8 ручек
+  `.crop-handle[data-handle]` внутри `#crop-overlay` (видны с классом
+  `crop-overlay--resizable`): `resizedCrop()` двигает края независимо, кламп к
+  картинке и `MIN_FRAME_PX`, прилипание к краям картинки и границам
+  непрозрачного. У фиксированных пропорций ручек нет — рамка всегда
+  максимальная. Кнопки `#trim-btn`/`#full-btn` возвращают рамку к
+  `opaqueBounds()`/всему изображению.
 - Обрезка выполняется через Canvas API (`drawImage` с исходными и целевыми
   прямоугольниками) — это единственный способ получить пиксельно точный кроп
   в браузере. Кодирование вынесено в `renderCropBlob()`: им пользуются и
@@ -91,17 +120,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Панель информации (`.info-panel` в правой зоне): ячейки размечены
   `data-info="…"` и заполняются через `setInfo`. `updateSourceInfo()` —
   один раз при загрузке; `updateOutputInfo()` вызывается из `updateOverlay`
-  и обновляется вживую при перетаскивании. Вес результата известен только
+  и обновляется вживую при перетаскивании. Строка «Steam» (`#target-info`,
+  обёртка `.info-list__row` с `display: contents`) видна только у пресетов
+  с `target`. Вес результата известен только
   после кодирования, поэтому `scheduleSizeEstimate()` кодирует кроп с
   debounce после смены якоря/конца перетаскивания и отбрасывает устаревшие
   ответы по счётчику `sizeSeq`.
-- Экспорт формата: `LOSSLESS_TYPES`/`CANVAS_EXPORTABLE_TYPES` определяют, что
-  Canvas может сохранить напрямую (PNG всегда без потерь; JPEG/WebP
-  перекодируются с `quality = 1.0`, так как Canvas не умеет резать JPEG на
-  уровне DCT-блоков). Всё остальное принудительно экспортируется как PNG.
-  `updateFormatNote` отражает это предупреждение в UI — при добавлении новых
-  форматов обнови обе функции (`pickExportType`, `updateFormatNote`)
-  согласованно.
+- Экспорт формата: `pickExportType` сохраняет формат как есть, если он в
+  `exportTypes` текущего пресета, иначе — PNG. «По пропорциям» —
+  `CANVAS_EXPORTABLE_TYPES` (PNG без потерь; JPEG/WebP перекодируются с
+  `quality = 1.0`, так как Canvas не умеет резать JPEG на уровне DCT-блоков),
+  Steam — `STEAM_EXPORTABLE_TYPES` (PNG/JPEG: WebP в Steam не гарантирован),
+  логотип — только PNG (альфа). `updateFormatNote` отражает это в UI — при
+  добавлении форматов или пресетов обнови обе функции согласованно.
 - Скачивание файла — через временный `<a download>` + `URL.createObjectURL`,
   без сетевых запросов.
 - Шрифты: `--font-text` (Roboto Flex — основной текст) и `--font-display`
@@ -126,12 +157,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Шапка сайта `.site-header` (над `<main class="app">`, во всю ширину, не
   закреплена; футер `.site-footer` — после `main`): логотип → меню сервисов → переключатель темы. Меню — нативный
   `<details class="service-menu">`; `app.js` только закрывает его по клику
-  снаружи и по Escape. Новый сервис = новая ссылка в `.service-menu__list`
-  (у текущего — `aria-current="page"`) и его название в `summary`.
+  снаружи и по Escape. Пункты меню — ссылки на hash (см. «Сервисы»
+  выше); `aria-current`, галочку и `summary` выставляет `applyService()`.
 
 ## PWA
 
-- `manifest.webmanifest` — установка как приложение, плюс `file_handlers`
+- `manifest.webmanifest` — установка как приложение, `shortcuts` на
+  `./#ratio` и `./#steam`, плюс `file_handlers`
   (открытие картинок из ОС, Chromium на десктопе) и `share_target` (приём фото
   через «Поделиться», в основном Android). Иконки — в `icons/`, PNG отрендерены
   из `icons/icon.svg` (maskable и apple-touch — тот же SVG без скругления).
